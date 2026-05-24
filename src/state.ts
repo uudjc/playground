@@ -34,6 +34,18 @@ export let regularizations: {[key: string]: nn.RegularizationFunction} = {
   "L2": nn.RegularizationFunction.L2
 };
 
+export let normalizations: {[key: string]: nn.Normalization} = {
+  "none": nn.Normalization.NONE,
+  "batchnorm": nn.Normalization.BATCH_NORM,
+  "layernorm": nn.Normalization.LAYER_NORM
+};
+
+export let optimizers: {[key: string]: nn.Optimizer} = {
+  "sgd": nn.Optimizer.SGD,
+  "adam": nn.Optimizer.ADAM,
+  "muon": nn.Optimizer.MUON
+};
+
 /** A map between dataset names and functions that generate classification data. */
 export let datasets: {[key: string]: dataset.DataGenerator} = {
   "circle": dataset.classifyCircleData,
@@ -106,6 +118,8 @@ export class State {
   private static PROPS: Property[] = [
     {name: "activation", type: Type.OBJECT, keyMap: activations},
     {name: "regularization", type: Type.OBJECT, keyMap: regularizations},
+    {name: "normalization", type: Type.OBJECT, keyMap: normalizations},
+    {name: "optimizer", type: Type.OBJECT, keyMap: optimizers},
     {name: "batchSize", type: Type.NUMBER},
     {name: "dataset", type: Type.OBJECT, keyMap: datasets},
     {name: "regDataset", type: Type.OBJECT, keyMap: regDatasets},
@@ -144,6 +158,8 @@ export class State {
   percTrainData = 50;
   activation = nn.Activations.TANH;
   regularization: nn.RegularizationFunction = null;
+  normalization = nn.Normalization.NONE;
+  optimizer = nn.Optimizer.SGD;
   problem = Problem.CLASSIFICATION;
   initZero = false;
   hideText = false;

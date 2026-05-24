@@ -22,6 +22,8 @@ import {
   activations,
   problems,
   regularizations,
+  normalizations,
+  optimizers,
   getKeyFromValue,
   Problem
 } from "./state";
@@ -82,6 +84,8 @@ let HIDABLE_CONTROLS = [
   ["Activation", "activation"],
   ["Regularization", "regularization"],
   ["Regularization rate", "regularizationRate"],
+  ["Normalization", "normalization"],
+  ["Optimizer", "optimizer"],
   ["Problem type", "problem"],
   ["Which dataset", "dataset"],
   ["Ratio train data", "percTrainData"],
@@ -352,6 +356,24 @@ function makeGUI() {
     reset();
   });
   regularRate.property("value", state.regularizationRate);
+
+  let normalizationDropdown = d3.select("#normalizations").on("change",
+      function() {
+    state.normalization = normalizations[this.value];
+    parametersChanged = true;
+    reset();
+  });
+  normalizationDropdown.property("value",
+      getKeyFromValue(normalizations, state.normalization));
+
+  let optimizerDropdown = d3.select("#optimizers").on("change", function() {
+    state.optimizer = optimizers[this.value];
+    state.serialize();
+    userHasInteracted();
+    parametersChanged = true;
+  });
+  optimizerDropdown.property("value",
+      getKeyFromValue(optimizers, state.optimizer));
 
   let problem = d3.select("#problem").on("change", function() {
     state.problem = problems[this.value];
@@ -908,14 +930,23 @@ function constructInput(x: number, y: number): number[] {
 
 function oneStep(): void {
   iter++;
+  let batchInputs: number[][] = [];
+  let batchTargets: number[] = [];
   trainData.forEach((point, i) => {
     let input = constructInput(point.x, point.y);
-    nn.forwardProp(network, input);
-    nn.backProp(network, point.label, nn.Errors.SQUARE);
+    batchInputs.push(input);
+    batchTargets.push(point.label);
     if ((i + 1) % state.batchSize === 0) {
-      nn.updateWeights(network, state.learningRate, state.regularizationRate);
+      nn.trainBatch(network, batchInputs, batchTargets, nn.Errors.SQUARE,
+          state.learningRate, state.regularizationRate, state.optimizer);
+      batchInputs = [];
+      batchTargets = [];
     }
   });
+  if (batchInputs.length > 0) {
+    nn.trainBatch(network, batchInputs, batchTargets, nn.Errors.SQUARE,
+        state.learningRate, state.regularizationRate, state.optimizer);
+  }
   // Compute the loss.
   lossTrain = getLoss(network, trainData);
   lossTest = getLoss(network, testData);
@@ -956,7 +987,8 @@ function reset(onStartup=false) {
   let outputActivation = (state.problem === Problem.REGRESSION) ?
       nn.Activations.LINEAR : nn.Activations.TANH;
   network = nn.buildNetwork(shape, state.activation, outputActivation,
-      state.regularization, constructInputIds(), state.initZero);
+      state.regularization, constructInputIds(), state.initZero,
+      state.normalization);
   lossTrain = getLoss(network, trainData);
   lossTest = getLoss(network, testData);
   drawNetwork(network);
