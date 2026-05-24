@@ -49,6 +49,36 @@ function scrollTween(offset) {
   };
 }
 
+function bindNumberControl(selector: string, stateKey: string,
+    resetOnChange: boolean): void {
+  let control = d3.select(selector).on("change", function() {
+    let value = +this.value;
+    if (isNaN(value)) {
+      return;
+    }
+    state[stateKey] = value;
+    state.serialize();
+    userHasInteracted();
+    parametersChanged = true;
+    if (resetOnChange) {
+      reset();
+    }
+  });
+  control.property("value", state[stateKey]);
+}
+
+function updateHyperparameterControls(): void {
+  d3.selectAll(".ui-batchNormHyperparameter").style("display",
+      state.normalization === nn.Normalization.BATCH_NORM ? null : "none");
+  d3.selectAll(".ui-normalizationEpsilonHyperparameter").style("display",
+      state.normalization === nn.Normalization.BATCH_NORM ||
+      state.normalization === nn.Normalization.LAYER_NORM ? null : "none");
+  d3.selectAll(".ui-adamHyperparameter").style("display",
+      state.optimizer === nn.Optimizer.ADAM ? null : "none");
+  d3.selectAll(".ui-muonHyperparameter").style("display",
+      state.optimizer === nn.Optimizer.MUON ? null : "none");
+}
+
 const RECT_SIZE = 30;
 const BIAS_SIZE = 5;
 const NUM_SAMPLES_CLASSIFY = 500;
@@ -93,6 +123,23 @@ let HIDABLE_CONTROLS = [
   ["Batch size", "batchSize"],
   ["# of hidden layers", "numHiddenLayers"],
 ];
+
+function getNormalizationHyperparameters(): nn.NormalizationHyperparameters {
+  return {
+    epsilon: state.normalizationEpsilon,
+    batchNormMomentum: state.batchNormMomentum
+  };
+}
+
+function getOptimizerHyperparameters(): nn.OptimizerHyperparameters {
+  return {
+    adamBeta1: state.adamBeta1,
+    adamBeta2: state.adamBeta2,
+    adamEpsilon: state.adamEpsilon,
+    muonMomentum: state.muonMomentum,
+    muonEpsilon: state.muonEpsilon
+  };
+}
 
 class Player {
   private timerIndex = 0;
@@ -361,6 +408,7 @@ function makeGUI() {
       function() {
     state.normalization = normalizations[this.value];
     parametersChanged = true;
+    updateHyperparameterControls();
     reset();
   });
   normalizationDropdown.property("value",
@@ -371,9 +419,19 @@ function makeGUI() {
     state.serialize();
     userHasInteracted();
     parametersChanged = true;
+    updateHyperparameterControls();
   });
   optimizerDropdown.property("value",
       getKeyFromValue(optimizers, state.optimizer));
+
+  bindNumberControl("#normalizationEpsilon", "normalizationEpsilon", true);
+  bindNumberControl("#batchNormMomentum", "batchNormMomentum", true);
+  bindNumberControl("#adamBeta1", "adamBeta1", false);
+  bindNumberControl("#adamBeta2", "adamBeta2", false);
+  bindNumberControl("#adamEpsilon", "adamEpsilon", false);
+  bindNumberControl("#muonMomentum", "muonMomentum", false);
+  bindNumberControl("#muonEpsilon", "muonEpsilon", false);
+  updateHyperparameterControls();
 
   let problem = d3.select("#problem").on("change", function() {
     state.problem = problems[this.value];
@@ -938,14 +996,16 @@ function oneStep(): void {
     batchTargets.push(point.label);
     if ((i + 1) % state.batchSize === 0) {
       nn.trainBatch(network, batchInputs, batchTargets, nn.Errors.SQUARE,
-          state.learningRate, state.regularizationRate, state.optimizer);
+          state.learningRate, state.regularizationRate, state.optimizer,
+          getOptimizerHyperparameters());
       batchInputs = [];
       batchTargets = [];
     }
   });
   if (batchInputs.length > 0) {
     nn.trainBatch(network, batchInputs, batchTargets, nn.Errors.SQUARE,
-        state.learningRate, state.regularizationRate, state.optimizer);
+        state.learningRate, state.regularizationRate, state.optimizer,
+        getOptimizerHyperparameters());
   }
   // Compute the loss.
   lossTrain = getLoss(network, trainData);
@@ -988,7 +1048,7 @@ function reset(onStartup=false) {
       nn.Activations.LINEAR : nn.Activations.TANH;
   network = nn.buildNetwork(shape, state.activation, outputActivation,
       state.regularization, constructInputIds(), state.initZero,
-      state.normalization);
+      state.normalization, getNormalizationHyperparameters());
   lossTrain = getLoss(network, trainData);
   lossTest = getLoss(network, testData);
   drawNetwork(network);

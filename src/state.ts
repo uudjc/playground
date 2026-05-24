@@ -120,6 +120,13 @@ export class State {
     {name: "regularization", type: Type.OBJECT, keyMap: regularizations},
     {name: "normalization", type: Type.OBJECT, keyMap: normalizations},
     {name: "optimizer", type: Type.OBJECT, keyMap: optimizers},
+    {name: "normalizationEpsilon", type: Type.NUMBER},
+    {name: "batchNormMomentum", type: Type.NUMBER},
+    {name: "adamBeta1", type: Type.NUMBER},
+    {name: "adamBeta2", type: Type.NUMBER},
+    {name: "adamEpsilon", type: Type.NUMBER},
+    {name: "muonMomentum", type: Type.NUMBER},
+    {name: "muonEpsilon", type: Type.NUMBER},
     {name: "batchSize", type: Type.NUMBER},
     {name: "dataset", type: Type.OBJECT, keyMap: datasets},
     {name: "regDataset", type: Type.OBJECT, keyMap: regDatasets},
@@ -160,6 +167,14 @@ export class State {
   regularization: nn.RegularizationFunction = null;
   normalization = nn.Normalization.NONE;
   optimizer = nn.Optimizer.SGD;
+  normalizationEpsilon = nn.DEFAULT_NORMALIZATION_HYPERPARAMETERS.epsilon;
+  batchNormMomentum =
+      nn.DEFAULT_NORMALIZATION_HYPERPARAMETERS.batchNormMomentum;
+  adamBeta1 = nn.DEFAULT_OPTIMIZER_HYPERPARAMETERS.adamBeta1;
+  adamBeta2 = nn.DEFAULT_OPTIMIZER_HYPERPARAMETERS.adamBeta2;
+  adamEpsilon = nn.DEFAULT_OPTIMIZER_HYPERPARAMETERS.adamEpsilon;
+  muonMomentum = nn.DEFAULT_OPTIMIZER_HYPERPARAMETERS.muonMomentum;
+  muonEpsilon = nn.DEFAULT_OPTIMIZER_HYPERPARAMETERS.muonEpsilon;
   problem = Problem.CLASSIFICATION;
   initZero = false;
   hideText = false;

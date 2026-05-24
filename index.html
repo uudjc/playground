@@ -137,6 +137,30 @@ limitations under the License.
             <option value="layernorm">LayerNorm</option>
           </select>
         </div>
+        <div class="hyperparameter-list">
+          <div class="hyperparameter ui-normalizationHyperparameter ui-batchNormHyperparameter ui-normalizationEpsilonHyperparameter">
+            <label for="normalizationEpsilon">Normalization epsilon</label>
+            <div class="select">
+              <select id="normalizationEpsilon">
+                <option value="0.000001">0.000001</option>
+                <option value="0.00001">0.00001</option>
+                <option value="0.0001">0.0001</option>
+                <option value="0.001">0.001</option>
+              </select>
+            </div>
+          </div>
+          <div class="hyperparameter ui-normalizationHyperparameter ui-batchNormHyperparameter">
+            <label for="batchNormMomentum">BatchNorm momentum</label>
+            <div class="select">
+              <select id="batchNormMomentum">
+                <option value="0.5">0.5</option>
+                <option value="0.7">0.7</option>
+                <option value="0.9">0.9</option>
+                <option value="0.99">0.99</option>
+              </select>
+            </div>
+          </div>
+        </div>
       </div>
       <div class="control ui-optimizer">
         <label for="optimizers">Optimizer</label>
@@ -146,6 +170,63 @@ limitations under the License.
             <option value="adam">Adam</option>
             <option value="muon">Muon</option>
           </select>
+        </div>
+        <div class="hyperparameter-list">
+          <div class="hyperparameter ui-optimizerHyperparameter ui-adamHyperparameter">
+            <label for="adamBeta1">Adam beta1</label>
+            <div class="select">
+              <select id="adamBeta1">
+                <option value="0.8">0.8</option>
+                <option value="0.9">0.9</option>
+                <option value="0.95">0.95</option>
+                <option value="0.99">0.99</option>
+              </select>
+            </div>
+          </div>
+          <div class="hyperparameter ui-optimizerHyperparameter ui-adamHyperparameter">
+            <label for="adamBeta2">Adam beta2</label>
+            <div class="select">
+              <select id="adamBeta2">
+                <option value="0.9">0.9</option>
+                <option value="0.99">0.99</option>
+                <option value="0.999">0.999</option>
+                <option value="0.9999">0.9999</option>
+              </select>
+            </div>
+          </div>
+          <div class="hyperparameter ui-optimizerHyperparameter ui-adamHyperparameter">
+            <label for="adamEpsilon">Adam epsilon</label>
+            <div class="select">
+              <select id="adamEpsilon">
+                <option value="1e-8">1e-8</option>
+                <option value="1e-7">1e-7</option>
+                <option value="0.000001">1e-6</option>
+                <option value="0.00001">1e-5</option>
+              </select>
+            </div>
+          </div>
+          <div class="hyperparameter ui-optimizerHyperparameter ui-muonHyperparameter">
+            <label for="muonMomentum">Muon momentum</label>
+            <div class="select">
+              <select id="muonMomentum">
+                <option value="0.8">0.8</option>
+                <option value="0.9">0.9</option>
+                <option value="0.95">0.95</option>
+                <option value="0.99">0.99</option>
+              </select>
+            </div>
+          </div>
+          <div class="hyperparameter ui-optimizerHyperparameter ui-muonHyperparameter">
+            <label for="muonEpsilon">Muon epsilon</label>
+            <div class="select">
+              <select id="muonEpsilon">
+                <option value="1e-7">1e-7</option>
+                <option value="0.000001">1e-6</option>
+                <option value="0.00001">1e-5</option>
+                <option value="0.0001">1e-4</option>
+              </select>
+            </div>
+          </div>
         </div>
       </div>
       <div class="control ui-problem">

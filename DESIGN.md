@@ -304,12 +304,15 @@ Adam 为每个标量参数维护：
 - `Node.normGamma`
 - `Node.normBeta`
 
-使用常量：
+当前实现不再把 Adam 超参数写死为文件级常量，而是通过
+`OptimizerHyperparameters` 传入：
 
 ```ts
-ADAM_BETA1 = 0.9
-ADAM_BETA2 = 0.999
-ADAM_EPSILON = 1e-8
+{
+  adamBeta1: number,
+  adamBeta2: number,
+  adamEpsilon: number
+}
 ```
 
 并带偏差修正：
@@ -345,6 +348,15 @@ shape: [numNodesInCurrentLayer, numNodesInPreviousLayer]
 
 当前 Muon 只用于隐藏层权重矩阵。输出层、bias、`gamma`、`beta` 等标量参数仍走 `applyScalarOptimizer()` 的标量路径。
 
+Muon 相关超参数同样通过状态注入，而不是写死常量：
+
+```ts
+{
+  muonMomentum: number,
+  muonEpsilon: number
+}
+```
+
 ## 6. UI 与状态设计
 
 ### 6.1 `src/state.ts`
@@ -370,16 +382,42 @@ optimizers: {
 ```ts
 normalization = nn.Normalization.NONE
 optimizer = nn.Optimizer.SGD
+normalizationEpsilon = 1e-5
+batchNormMomentum = 0.9
+adamBeta1 = 0.9
+adamBeta2 = 0.999
+adamEpsilon = 1e-8
+muonMomentum = 0.95
+muonEpsilon = 1e-7
 ```
 
 并加入 `State.PROPS`，因此可以通过 URL hash 保存和恢复。
 
 ### 6.2 `index.html`
 
-顶部控制栏新增两个下拉框：
+顶部控制栏新增 normalization / optimizer 选择和对应的超参数控件。
+
+基础下拉框：
 
 - `Normalization`: `None / BatchNorm / LayerNorm`
 - `Optimizer`: `SGD / Adam / Muon`
+
+超参数控件按选择结果条件显示：
+
+- 选择 `BatchNorm` 时显示：
+  - `Normalization epsilon`
+  - `BatchNorm momentum`
+- 选择 `LayerNorm` 时显示：
+  - `Normalization epsilon`
+- 选择 `Adam` 时显示：
+  - `Adam beta1`
+  - `Adam beta2`
+  - `Adam epsilon`
+- 选择 `Muon` 时显示：
+  - `Muon momentum`
+  - `Muon epsilon`
+
+未选择对应算法时，不显示对应控件。
 
 默认选项仍是：
 
@@ -393,18 +431,36 @@ optimizer = nn.Optimizer.SGD
 核心接线：
 
 - `makeGUI()` 绑定 normalization 和 optimizer 下拉框
-- `reset()` 构建网络时把 `state.normalization` 传入 `nn.buildNetwork()`
-- `oneStep()` 按 `state.batchSize` 收集 batch，并调用 `nn.trainBatch()`
+- `bindNumberControl()` 绑定超参数下拉框
+- `updateHyperparameterControls()` 根据当前选择显示或隐藏超参数控件
+- `reset()` 构建网络时把 `state.normalization` 和 normalization 超参数传入 `nn.buildNetwork()`
+- `oneStep()` 按 `state.batchSize` 收集 batch，并调用 `nn.trainBatch()`，同时传入 optimizer 超参数
 
 `oneStep()` 的训练流变为：
 
 ```text
 收集 batchInputs / batchTargets
   -> nn.trainBatch(...)
-  -> 剩余不足 batchSize 的样本也训练一次
+ -> 剩余不足 batchSize 的样本也训练一次
   -> 计算 train/test loss
   -> updateUI()
 ```
+
+### 6.4 超参数对象
+
+为了避免在训练核心中直接依赖 UI 状态，`src/playground.ts` 中增加了两个转换函数：
+
+- `getNormalizationHyperparameters()`
+- `getOptimizerHyperparameters()`
+
+它们把 `state` 中的超参数转换为训练层所需的对象：
+
+```ts
+NormalizationHyperparameters
+OptimizerHyperparameters
+```
+
+训练层只接收这些对象，不直接读取 UI。
 
 ## 7. 测试设计
 
@@ -429,6 +485,11 @@ test/nn_smoke_test.js
 - 前向输出为有限数
 - bias、weight、gamma、beta 均为有限数
 - BatchNorm 的 running statistics 会更新
+
+由于超参数现在是可配置的，测试同时覆盖了：
+
+- normalization 和 optimizer 默认超参数路径仍可运行
+- 训练核心在接收外部超参数对象后仍能稳定收敛到有限数值
 
 `package.json` 新增：
 

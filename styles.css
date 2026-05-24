@@ -351,6 +351,19 @@ header h1 .optional {
   pointer-events: none;
 }
 
+#top-controls .control .hyperparameter-list {
+  display: block;
+  margin-top: 8px;
+}
+
+#top-controls .control .hyperparameter {
+  margin-top: 10px;
+}
+
+#top-controls .control .hyperparameter:first-child {
+  margin-top: 0;
+}
+
 /* Hover card */
 #hovercard {
   display: none;

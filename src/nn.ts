@@ -142,15 +142,35 @@ interface TrainingNodeState {
 
 interface NeuralNetwork extends Array<Node[]> {
   normalization?: Normalization;
+  normalizationHyperparameters?: NormalizationHyperparameters;
 }
 
-const NORMALIZATION_EPSILON = 1e-5;
-const BATCH_NORM_MOMENTUM = 0.9;
-const ADAM_BETA1 = 0.9;
-const ADAM_BETA2 = 0.999;
-const ADAM_EPSILON = 1e-8;
-const MUON_BETA = 0.95;
-const MUON_EPSILON = 1e-7;
+export interface NormalizationHyperparameters {
+  epsilon: number;
+  batchNormMomentum: number;
+}
+
+export interface OptimizerHyperparameters {
+  adamBeta1: number;
+  adamBeta2: number;
+  adamEpsilon: number;
+  muonMomentum: number;
+  muonEpsilon: number;
+}
+
+export const DEFAULT_NORMALIZATION_HYPERPARAMETERS:
+    NormalizationHyperparameters = {
+  epsilon: 1e-5,
+  batchNormMomentum: 0.9
+};
+
+export const DEFAULT_OPTIMIZER_HYPERPARAMETERS: OptimizerHyperparameters = {
+  adamBeta1: 0.9,
+  adamBeta2: 0.999,
+  adamEpsilon: 1e-8,
+  muonMomentum: 0.95,
+  muonEpsilon: 1e-7
+};
 
 /** Built-in error functions */
 export class Errors {
@@ -271,7 +291,9 @@ export function buildNetwork(
     outputActivation: ActivationFunction,
     regularization: RegularizationFunction,
     inputIds: string[], initZero?: boolean,
-    normalization: Normalization = Normalization.NONE): Node[][] {
+    normalization: Normalization = Normalization.NONE,
+    normalizationHyperparameters: NormalizationHyperparameters =
+        DEFAULT_NORMALIZATION_HYPERPARAMETERS): Node[][] {
   let numLayers = networkShape.length;
   let id = 1;
   /** List of layers, with each layer being a list of nodes. */
@@ -304,11 +326,19 @@ export function buildNetwork(
     }
   }
   (network as NeuralNetwork).normalization = normalization;
+  (network as NeuralNetwork).normalizationHyperparameters =
+      normalizationHyperparameters;
   return network;
 }
 
 function getNormalization(network: Node[][]): Normalization {
   return (network as NeuralNetwork).normalization || Normalization.NONE;
+}
+
+function getNormalizationHyperparameters(network: Node[][]):
+    NormalizationHyperparameters {
+  return (network as NeuralNetwork).normalizationHyperparameters ||
+      DEFAULT_NORMALIZATION_HYPERPARAMETERS;
 }
 
 function getMean(values: number[]): number {
@@ -329,10 +359,10 @@ function getVariance(values: number[], mean: number): number {
 }
 
 function setNormalizedOutput(node: Node, rawInput: number, mean: number,
-    variance: number): number {
+    variance: number, epsilon: number): number {
   node.normMean = mean;
   node.normVariance = variance;
-  node.normStdInv = 1 / Math.sqrt(variance + NORMALIZATION_EPSILON);
+  node.normStdInv = 1 / Math.sqrt(variance + epsilon);
   node.normalizedInput = (rawInput - mean) * node.normStdInv;
   node.totalInput = node.normGamma * node.normalizedInput + node.normBeta;
   node.output = node.activation.output(node.totalInput);
@@ -361,6 +391,7 @@ export function forwardProp(network: Node[][], inputs: number[]): number {
     node.output = inputs[i];
   }
   let normalization = getNormalization(network);
+  let normalizationHyperparameters = getNormalizationHyperparameters(network);
   for (let layerIdx = 1; layerIdx < network.length; layerIdx++) {
     let currentLayer = network[layerIdx];
     let isOutputLayer = layerIdx === network.length - 1;
@@ -378,14 +409,15 @@ export function forwardProp(network: Node[][], inputs: number[]): number {
       let mean = getMean(rawInputs);
       let variance = getVariance(rawInputs, mean);
       for (let i = 0; i < currentLayer.length; i++) {
-        setNormalizedOutput(currentLayer[i], rawInputs[i], mean, variance);
+        setNormalizedOutput(currentLayer[i], rawInputs[i], mean, variance,
+            normalizationHyperparameters.epsilon);
       }
     } else {
       for (let i = 0; i < currentLayer.length; i++) {
         let node = currentLayer[i];
         let rawInput = node.computeTotalInput();
         setNormalizedOutput(node, rawInput, node.runningMean,
-            node.runningVariance);
+            node.runningVariance, normalizationHyperparameters.epsilon);
       }
     }
   }
@@ -419,6 +451,7 @@ function forwardBatch(network: Node[][], inputs: number[][]):
   let samples: {[id: string]: TrainingNodeState}[] = [];
   let inputLayer = network[0];
   let normalization = getNormalization(network);
+  let normalizationHyperparameters = getNormalizationHyperparameters(network);
   for (let sampleIdx = 0; sampleIdx < inputs.length; sampleIdx++) {
     if (inputs[sampleIdx].length !== inputLayer.length) {
       throw new Error("The number of inputs must match the number of nodes in" +
@@ -467,7 +500,8 @@ function forwardBatch(network: Node[][], inputs: number[][]):
         }
         let mean = getMean(rawInputs);
         let variance = getVariance(rawInputs, mean);
-        let stdInv = 1 / Math.sqrt(variance + NORMALIZATION_EPSILON);
+        let stdInv = 1 / Math.sqrt(variance +
+            normalizationHyperparameters.epsilon);
         for (let i = 0; i < currentLayer.length; i++) {
           let node = currentLayer[i];
           let state = getSampleNodeState(sample, node);
@@ -486,11 +520,15 @@ function forwardBatch(network: Node[][], inputs: number[][]):
         }
         let mean = getMean(rawInputs);
         let variance = getVariance(rawInputs, mean);
-        let stdInv = 1 / Math.sqrt(variance + NORMALIZATION_EPSILON);
-        node.runningMean = BATCH_NORM_MOMENTUM * node.runningMean +
-            (1 - BATCH_NORM_MOMENTUM) * mean;
-        node.runningVariance = BATCH_NORM_MOMENTUM * node.runningVariance +
-            (1 - BATCH_NORM_MOMENTUM) * variance;
+        let stdInv = 1 / Math.sqrt(variance +
+            normalizationHyperparameters.epsilon);
+        node.runningMean =
+            normalizationHyperparameters.batchNormMomentum * node.runningMean +
+            (1 - normalizationHyperparameters.batchNormMomentum) * mean;
+        node.runningVariance =
+            normalizationHyperparameters.batchNormMomentum *
+            node.runningVariance +
+            (1 - normalizationHyperparameters.batchNormMomentum) * variance;
         for (let sampleIdx = 0; sampleIdx < samples.length; sampleIdx++) {
           let state = getSampleNodeState(samples[sampleIdx], node);
           state.normalizedInput = (state.rawInput - mean) * stdInv;
@@ -508,7 +546,9 @@ function forwardBatch(network: Node[][], inputs: number[][]):
 export function trainBatch(network: Node[][], inputs: number[][],
     targets: number[], errorFunc: ErrorFunction, learningRate: number,
     regularizationRate: number,
-    optimizer: Optimizer = Optimizer.SGD): void {
+    optimizer: Optimizer = Optimizer.SGD,
+    optimizerHyperparameters: OptimizerHyperparameters =
+        DEFAULT_OPTIMIZER_HYPERPARAMETERS): void {
   if (inputs.length !== targets.length) {
     throw new Error("The number of inputs must match the number of targets");
   }
@@ -524,6 +564,7 @@ export function trainBatch(network: Node[][], inputs: number[][],
   }
 
   let normalization = getNormalization(network);
+  let normalizationHyperparameters = getNormalizationHyperparameters(network);
   for (let layerIdx = network.length - 1; layerIdx >= 1; layerIdx--) {
     let currentLayer = network[layerIdx];
     let prevLayer = network[layerIdx - 1];
@@ -566,7 +607,8 @@ export function trainBatch(network: Node[][], inputs: number[][],
         }
         let mean = getMean(rawInputs);
         let variance = getVariance(rawInputs, mean);
-        let stdInv = 1 / Math.sqrt(variance + NORMALIZATION_EPSILON);
+        let stdInv = 1 / Math.sqrt(variance +
+            normalizationHyperparameters.epsilon);
         let meanDxHat = getMean(dxHat);
         let dxHatTimesXHat: number[] = [];
         for (let i = 0; i < dxHat.length; i++) {
@@ -598,7 +640,8 @@ export function trainBatch(network: Node[][], inputs: number[][],
         }
         let mean = getMean(rawInputs);
         let variance = getVariance(rawInputs, mean);
-        let stdInv = 1 / Math.sqrt(variance + NORMALIZATION_EPSILON);
+        let stdInv = 1 / Math.sqrt(variance +
+            normalizationHyperparameters.epsilon);
         let meanDxHat = getMean(dxHat);
         let dxHatTimesXHat: number[] = [];
         for (let sampleIdx = 0; sampleIdx < samples.length; sampleIdx++) {
@@ -635,7 +678,8 @@ export function trainBatch(network: Node[][], inputs: number[][],
     }
   }
 
-  updateWeights(network, learningRate, regularizationRate, optimizer);
+  updateWeights(network, learningRate, regularizationRate, optimizer,
+      optimizerHyperparameters);
 }
 
 /**
@@ -697,17 +741,22 @@ export function backProp(network: Node[][], target: number,
 
 function applyScalarOptimizer(value: number, grad: number,
     learningRate: number, optimizer: Optimizer,
-    state: ScalarOptimizerState): number {
+    state: ScalarOptimizerState,
+    optimizerHyperparameters: OptimizerHyperparameters): number {
   if (optimizer === Optimizer.SGD) {
     return value - learningRate * grad;
   }
   state.t++;
-  state.m = ADAM_BETA1 * state.m + (1 - ADAM_BETA1) * grad;
-  state.v = ADAM_BETA2 * state.v + (1 - ADAM_BETA2) * grad * grad;
-  let correctedM = state.m / (1 - Math.pow(ADAM_BETA1, state.t));
-  let correctedV = state.v / (1 - Math.pow(ADAM_BETA2, state.t));
+  state.m = optimizerHyperparameters.adamBeta1 * state.m +
+      (1 - optimizerHyperparameters.adamBeta1) * grad;
+  state.v = optimizerHyperparameters.adamBeta2 * state.v +
+      (1 - optimizerHyperparameters.adamBeta2) * grad * grad;
+  let correctedM = state.m /
+      (1 - Math.pow(optimizerHyperparameters.adamBeta1, state.t));
+  let correctedV = state.v /
+      (1 - Math.pow(optimizerHyperparameters.adamBeta2, state.t));
   return value - learningRate * correctedM /
-      (Math.sqrt(correctedV) + ADAM_EPSILON);
+      (Math.sqrt(correctedV) + optimizerHyperparameters.adamEpsilon);
 }
 
 function matrixTranspose(matrix: number[][]): number[][] {
@@ -736,12 +785,12 @@ function matrixMultiply(a: number[][], b: number[][]): number[][] {
   return result;
 }
 
-function orthogonalize(matrix: number[][]): number[][] {
+function orthogonalize(matrix: number[][], epsilon: number): number[][] {
   if (matrix.length === 0 || matrix[0].length === 0) {
     return matrix;
   }
   if (matrix.length > matrix[0].length) {
-    return matrixTranspose(orthogonalize(matrixTranspose(matrix)));
+    return matrixTranspose(orthogonalize(matrixTranspose(matrix), epsilon));
   }
   let norm = 0;
   for (let i = 0; i < matrix.length; i++) {
@@ -754,7 +803,7 @@ function orthogonalize(matrix: number[][]): number[][] {
   for (let i = 0; i < matrix.length; i++) {
     x[i] = [];
     for (let j = 0; j < matrix[i].length; j++) {
-      x[i][j] = matrix[i][j] / (norm + MUON_EPSILON);
+      x[i][j] = matrix[i][j] / (norm + epsilon);
     }
   }
   for (let iter = 0; iter < 5; iter++) {
@@ -770,7 +819,8 @@ function orthogonalize(matrix: number[][]): number[][] {
 }
 
 function updateLayerWeightsWithMuon(network: Node[][], layerIdx: number,
-    learningRate: number, regularizationRate: number): boolean {
+    learningRate: number, regularizationRate: number,
+    optimizerHyperparameters: OptimizerHyperparameters): boolean {
   if (layerIdx >= network.length - 1) {
     return false;
   }
@@ -792,12 +842,14 @@ function updateLayerWeightsWithMuon(network: Node[][], layerIdx: number,
           link.regularization.der(link.weight) : 0;
       let grad = link.accErrorDer / link.numAccumulatedDers +
           regularizationRate * regulDer;
-      link.muonMomentum = MUON_BETA * link.muonMomentum +
-          (1 - MUON_BETA) * grad;
+      link.muonMomentum = optimizerHyperparameters.muonMomentum *
+          link.muonMomentum +
+          (1 - optimizerHyperparameters.muonMomentum) * grad;
       gradientMatrix[row][col] = link.muonMomentum;
     }
   }
-  let updateMatrix = orthogonalize(gradientMatrix);
+  let updateMatrix = orthogonalize(gradientMatrix,
+      optimizerHyperparameters.muonEpsilon);
   for (let row = 0; row < currentLayer.length; row++) {
     let node = currentLayer[row];
     for (let col = 0; col < node.inputLinks.length; col++) {
@@ -817,19 +869,21 @@ function updateLayerWeightsWithMuon(network: Node[][], layerIdx: number,
  * derivatives.
  */
 export function updateWeights(network: Node[][], learningRate: number,
-    regularizationRate: number, optimizer: Optimizer = Optimizer.SGD) {
+    regularizationRate: number, optimizer: Optimizer = Optimizer.SGD,
+    optimizerHyperparameters: OptimizerHyperparameters =
+        DEFAULT_OPTIMIZER_HYPERPARAMETERS) {
   for (let layerIdx = 1; layerIdx < network.length; layerIdx++) {
     let currentLayer = network[layerIdx];
     let muonUpdatedLayer = optimizer === Optimizer.MUON &&
         updateLayerWeightsWithMuon(network, layerIdx, learningRate,
-            regularizationRate);
+            regularizationRate, optimizerHyperparameters);
     for (let i = 0; i < currentLayer.length; i++) {
       let node = currentLayer[i];
       // Update the node's bias.
       if (node.numAccumulatedDers > 0) {
         let biasGrad = node.accInputDer / node.numAccumulatedDers;
         node.bias = applyScalarOptimizer(node.bias, biasGrad, learningRate,
-            optimizer, node.biasOptimizerState);
+            optimizer, node.biasOptimizerState, optimizerHyperparameters);
         node.accInputDer = 0;
         node.numAccumulatedDers = 0;
       }
@@ -837,9 +891,11 @@ export function updateWeights(network: Node[][], learningRate: number,
         let gammaGrad = node.accNormGammaDer / node.numAccumulatedNormDers;
         let betaGrad = node.accNormBetaDer / node.numAccumulatedNormDers;
         node.normGamma = applyScalarOptimizer(node.normGamma, gammaGrad,
-            learningRate, optimizer, node.normGammaOptimizerState);
+            learningRate, optimizer, node.normGammaOptimizerState,
+            optimizerHyperparameters);
         node.normBeta = applyScalarOptimizer(node.normBeta, betaGrad,
-            learningRate, optimizer, node.normBetaOptimizerState);
+            learningRate, optimizer, node.normBetaOptimizerState,
+            optimizerHyperparameters);
         node.accNormGammaDer = 0;
         node.accNormBetaDer = 0;
         node.numAccumulatedNormDers = 0;
@@ -859,7 +915,8 @@ export function updateWeights(network: Node[][], learningRate: number,
           let grad = link.accErrorDer / link.numAccumulatedDers +
               regularizationRate * regulDer;
           let newLinkWeight = applyScalarOptimizer(link.weight, grad,
-              learningRate, optimizer, link.optimizerState);
+              learningRate, optimizer, link.optimizerState,
+              optimizerHyperparameters);
           if (optimizer === Optimizer.SGD &&
               link.regularization === RegularizationFunction.L1 &&
               link.weight * newLinkWeight < 0) {
