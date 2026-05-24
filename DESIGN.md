@@ -462,7 +462,9 @@ OptimizerHyperparameters
 
 训练层只接收这些对象，不直接读取 UI。
 
-## 7. 测试设计
+## 7. 测试
+
+### 7.1 测试设计
 
 新增测试文件：
 
@@ -497,9 +499,7 @@ test/nn_smoke_test.js
 "test": "node test/nn_smoke_test.js"
 ```
 
-## 8. 验证结果
-
-### 8.1 安装依赖
+### 7.2 测试命令
 
 首次运行或清理过 `node_modules` 后，先安装锁定版本依赖：
 
@@ -507,8 +507,6 @@ test/nn_smoke_test.js
 cd /home/user/playground
 npm ci
 ```
-
-### 8.2 测试命令
 
 运行新增的神经网络 smoke test：
 
@@ -523,7 +521,21 @@ npm test
 node test/nn_smoke_test.js
 ```
 
-### 8.3 构建命令
+### 7.3 测试结果
+
+已执行：
+
+```bash
+npm test
+```
+
+结果：
+
+- `npm test` 通过
+
+## 8. 构建与运行
+
+### 8.1 构建命令
 
 生成正式静态产物：
 
@@ -538,7 +550,7 @@ npm run build
 dist/
 ```
 
-### 8.4 正式运行命令
+### 8.2 正式运行命令
 
 构建完成后，从 `dist/` 目录启动静态服务：
 
@@ -562,16 +574,14 @@ npm run serve
 
 注意：当前环境中 `npm run serve` 依赖的 `serve` 包在 Node 24 下可能触发 `uv_interface_addresses` 系统错误；如果遇到该错误，使用上面的 `python3 -m http.server 5000` 方式运行构建产物。
 
-### 8.5 当前验证记录
+### 8.3 构建验证记录
 
 已执行：
 
 ```bash
-npm test
 npm run build
 ```
 
 结果：
 
-- `npm test` 通过
 - `npm run build` 通过
