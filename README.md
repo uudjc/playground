@@ -1,3 +1,6 @@
+# Note
+This repository is a forked version of https://github.com/tensorflow/playground.
+
 # Deep playground
 
 Deep playground is an interactive visualization of neural networks, written in
