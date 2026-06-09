@@ -32,6 +32,12 @@
 
 完整设计见 [DESIGN.md](DESIGN.md)。
 
+## 运行截图
+
+下图为本项目在 `BatchNorm + Adam` 配置下的运行界面：
+
+![TF Playground 扩展运行截图](docs/screenshot.png)
+
 ## 运行方式
 
 首次运行请安装依赖：
