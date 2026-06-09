@@ -364,8 +364,8 @@ function makeGUI() {
   d3.select("label[for='noise'] .value").text(state.noise);
 
   let batchSize = d3.select("#batchSize").on("input", function() {
-    state.batchSize = this.value;
-    d3.select("label[for='batchSize'] .value").text(this.value);
+    state.batchSize = +this.value;
+    d3.select("label[for='batchSize'] .value").text(state.batchSize);
     parametersChanged = true;
     reset();
   });
